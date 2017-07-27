@@ -1,0 +1,17 @@
+{
+  "name": "splitter",
+  "version": "0.1.0",
+  "description": "First Contract Practice",
+  "main": "truffle.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Mauricio Cano Giraldo",
+  "license": "MIT",
+  "dependencies": {
+    "truffle-default-builder": "^2.0.0"
+  }
+}
