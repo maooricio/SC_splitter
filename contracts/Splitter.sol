@@ -3,20 +3,13 @@
 pragma solidity ^0.4.6;
 
 contract Splitter {
-  address public owner;
-  uint    public participantsCount;
-  bool    public contractDead;
-  
-  struct ParticipantStruct {
-    address participantAddress;
-  }
-  
-  ParticipantStruct[] public participantStructs;
-  
-  event LogContractState(address contractAddress, bool isContractDead);
-  event LogParticipantsCount(uint newParticipantsCount);
-  event LogAccountBalance(address ownerAddress, uint accountBalance);
-  event LogOwnerBalance(address ownerAddress, uint ownerAccountBalance);
+  address      public owner;
+  address[2]   public participantsAdresses;
+  bool         public participantsEstablished;
+  bool         public contractDead;
+
+  event LogParticipantsAdresses(address[2] newParticipantsAddresses);
+  event LogAccountsBalances(address participantAddress1, uint balanceParticipant1, address participantAddress2, uint balanceParticipant2);
   
   function Splitter() {
     owner = msg.sender;
@@ -28,56 +21,46 @@ contract Splitter {
   {
     if(contractDead) throw;
     if(msg.value == 0) throw;
-    if(msg.sender != owner) {
-      LogContractState(this, contractDead);
-      return true;
+    if(msg.sender == owner && !participantsEstablished) throw;
+    if(msg.sender == owner) {
+      for(uint i = 0; i<2; i++){
+        if(!participantsAdresses[i].send(msg.value/2)) throw;
+      }
+      
+      LogAccountsBalances(participantsAdresses[0], participantsAdresses[0].balance, participantsAdresses[1], participantsAdresses[1].balance);
     }
     
-    participantsCount = participantStructs.length;
-    if(participantsCount < 2) {
-      if(!owner.send(msg.value)) throw;
-      LogOwnerBalance(owner, owner.balance);
-      return false;
-    }
-    
-    for(uint i = 0; i<2; i++){
-      if(!participantStructs[i].participantAddress.send(msg.value/participantsCount)) throw;
-      LogAccountBalance(participantStructs[i].participantAddress, participantStructs[i].participantAddress.balance);
-    }
     return true;
   }
   
-  function seeParticipantsAddresses(uint indexOfParticipant) constant returns (address participantAddress) {
-    if(contractDead) throw;
-    return participantStructs[indexOfParticipant].participantAddress;
+  function seeParticipantsAddresses() constant returns (address[2] actualParticipantAddresses) {
+    return participantsAdresses;
   }
   
-  function getParticipantsCount() public constant returns(uint actualParticipantsCount) {
-    if(contractDead) throw;
-    
-    participantsCount = participantStructs.length;
-    LogParticipantsCount(participantsCount);
-    return participantsCount;
-  }
-  
-  function addNewParticipantAccount(address newParticipantAddress) 
-    public 
-    returns(bool participantAdded) 
+  function addTwoParticipantsAccounts(address participantAddress1, address participantAddress2) 
+    public
+    returns(bool participantsAdded) 
   {
     if(contractDead) throw;
     if(msg.sender != owner) throw;
+    if(participantAddress1 == 0 || participantAddress2 == 0) throw;
     
-    ParticipantStruct memory newParticipant;
-    newParticipant.participantAddress = newParticipantAddress;
-    participantStructs.push(newParticipant);
+    participantsAdresses[0] = participantAddress1;
+    participantsAdresses[1] = participantAddress2;
+    
+    participantsEstablished = true;
+    LogParticipantsAdresses(participantsAdresses);
     return true;
   }
   
   function setContractState(bool stateOfContract) public returns(bool isContractAlive) {
     if(msg.sender != owner) throw;
     contractDead = stateOfContract;
-    LogContractState(this, contractDead);
     if(contractDead) return false;
-    else return true;
+    else return !contractDead;
+  }
+  
+  function seeContractState() constant returns (bool actualContractState) {
+    return contractDead;
   }
 }

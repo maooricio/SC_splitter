@@ -35,7 +35,7 @@ contract('Splitter', function(accounts) {
   });
 
   it('Should not accept change of contract state from other person that is not the owner', function() {
-    return contract.seeParticipantsAddresses(1, { from: externalContributor })
+    return contract.setContractState(true, { from: externalContributor })
     .then(assert.fail)
     .catch(function(error) {
       assert(
@@ -56,47 +56,34 @@ contract('Splitter', function(accounts) {
     assert.equal(finalContractBalance, expectedContractBalance, 'Contribution is not in the contract totally');
   });
 
-  it('Should not accept contribution from the owner if there are not at least 2 participants, the conyribution is returned to the owner', async function() {
-    let initialOwnerBalance = await web3.eth.getBalance(owner).toString(10);
-    let initialContractBalance = await web3.eth.getBalance(contract.address).toString(10);
-
-    let txn = await contract.contribute({ from: owner, value: amountToContribute });
-    
-    let gasUsed = txn.receipt.gasUsed;
-    let gasPrice = contract.constructor.class_defaults.gasPrice;
-    let totalGasCost = gasUsed * gasPrice;
-
-    let finalOwnerBalance = await web3.eth.getBalance(owner).toString(10);
-    let finalContractBalance = await web3.eth.getBalance(contract.address).toString(10);
-
-    //Data expected
-    let expectedOwnerBalance = initialOwnerBalance - totalGasCost;
-
-    assert.equal(finalContractBalance, initialContractBalance, `Contribution was not returned to the owner, the contract have it`);
-    assert.equal(finalOwnerBalance, expectedOwnerBalance, `Contribution was not returned to the owner`);
+  it('Should not accept contribution from the owner if there are not at least 2 participants', async function() {
+    return contract.contribute({ from: owner, value: amountToContribute })
+    .then(assert.fail)
+    .catch(function(error) {
+      assert(
+        error.message.indexOf('Error: There are not at least two participants in the contract')
+      )
+    });
   });
 
   it('Should add two participants to the contract, the owner makes a contribution, the contract does not hold the contribution and send the half of it to each participant', async function() {
-    let initialNumberOfParticipants = await contract.getParticipantsCount({ from: owner });
     let initialContractBalance = await web3.eth.getBalance(contract.address).toString(10);
     let initialFirstParticipantBalance = await web3.eth.getBalance(addressOfParticipant1).toString(10);
     let initialSecondParticipantBalance = await web3.eth.getBalance(addressOfParticipant2).toString(10);
 
-    await contract.addNewParticipantAccount(addressOfParticipant1);
-    await contract.addNewParticipantAccount(addressOfParticipant2);
-
+    await contract.addTwoParticipantsAccounts(addressOfParticipant1, addressOfParticipant2);
     await contract.contribute({ from: owner, value: amountToContribute });
 
-    let finalNumberOfParticipants = await contract.getParticipantsCount({ from: owner });
     let finalFirstParticipantBalance = await web3.eth.getBalance(addressOfParticipant1).toString(10);
     let finalSecondParticipantBalance = await web3.eth.getBalance(addressOfParticipant2).toString(10);
 
     //Data expected
+    let participantsEstablished = await contract.participantsEstablished({ from: owner });
     let amountToEachAddress = amountToContribute / participantsCount;
     let expectedFirstParticipantBalance = initialFirstParticipantBalance - amountToEachAddress;
     let expectedSecondParticipantBalance = initialSecondParticipantBalance - amountToEachAddress;
 
-    assert.equal(finalNumberOfParticipants, parseInt(initialNumberOfParticipants + 2), 'A new participant is not in the contract');
+    assert.equal(participantsEstablished, true, 'Participants are not established');
     assert.equal(finalFirstParticipantBalance, expectedFirstParticipantBalance, 'First participant does not receive the half of the contribution');
     assert.equal(finalSecondParticipantBalance, expectedSecondParticipantBalance, 'Second participant does not receive the half of the contribution');
   });
