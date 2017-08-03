@@ -12,24 +12,18 @@ contract('Splitter', function(accounts) {
   var addressOfParticipant2 = accounts[3];
 
   beforeEach(function () {
-    return Splitter.deployed().then(function(instance) {
+    return Splitter.new({ from: owner })
+    .then(function(instance) {
       contract = instance;
     });
   });
 
-  it('Should be owned by owner', function() {
-    return contract.owner({ from: owner })
-    .then(function(_owner) {
-      assert.strictEqual(_owner, owner, 'Contract is not owned by owner');
-    })
-  });
-
-  it('Should not accept contribute with value 0', function() {
+  it('Should not accept contribute with value 0', async function() {
     return contract.contribute({ from: externalContributor, value: 0 })
     .then(assert.fail)
     .catch(function(error) {
       assert(
-        error.message.indexOf('Error: You have to send an amount higher than 0')
+        error.message.indexOf('invalid JUMP')
       )
     });
   });
@@ -39,14 +33,15 @@ contract('Splitter', function(accounts) {
     .then(assert.fail)
     .catch(function(error) {
       assert(
-        error.message.indexOf('Error: You are not the owner of the contract')
+        error.message.indexOf('invalid JUMP')
       )
     });
   });
 
   it('Should amount of external contributor goes to the contract totally', async function() {
     let initialContractBalance = await web3.eth.getBalance(contract.address);
-    await contract.contribute({ from: externalContributor, value: amountToContribute });
+    let txn = await contract.contribute({ from: externalContributor, value: amountToContribute });
+    console.log(txn);
 
     let finalContractBalance = await web3.eth.getBalance(contract.address);
 
@@ -61,7 +56,7 @@ contract('Splitter', function(accounts) {
     .then(assert.fail)
     .catch(function(error) {
       assert(
-        error.message.indexOf('Error: There are not at least two participants in the contract')
+        error.message.indexOf('invalid JUMP')
       )
     });
   });
