@@ -4,59 +4,53 @@ pragma solidity ^0.4.6;
 
 contract Splitter {
   address     public owner;
-  address     public participantAddress1;
-  address     public participantAddress2;
   bool        public contractDead;
   
-  struct ParticipantStruct {
-      uint    authorizedAmountToWithdrawal;
-      bool    isParticipant;
+  struct ApplicantStruct {
+    uint    authorizedAmountToWithdrawal;
+    bool    isAuthorized;
   }
   
-  mapping(address => ParticipantStruct) public participantsStruct;
+  mapping(address => ApplicantStruct) public applicantsStruct;
   
-  event LogDataOfTransaction(address addressOfSender, uint amountSent);
-  event LogDataOfWithdrawal(address addressOfParticipant, uint amountWithdrawn);
+  event LogDataOfTransaction(address addressOfSender, uint amountDeposited, uint amountRefund);
+  event LogDataOfWithdrawal(address addressOfAplicant, uint amountWithdrawn);
   
-  function Splitter(address _participantAddress1, address _participantAddress2)
+  function Splitter()
   {
+    // Just to know who deploy the contract in the future
     owner = msg.sender;
-    participantAddress1 = _participantAddress1;
-    participantAddress2 = _participantAddress2;
-    
-    participantsStruct[participantAddress1].isParticipant = true;
-    participantsStruct[participantAddress2].isParticipant = true;
   }
   
-  function isParticipant(address participantAddress) 
+  function isAuthorized(address requestingAddress) 
     public constant 
     returns(bool authorizedParticipant) 
   {
-    return participantsStruct[participantAddress].isParticipant;
+    return applicantsStruct[requestingAddress].isAuthorized;
   }
   
-  function depositFunds() 
+  function depositFunds(address authorizedApplicantAddress1, address authorizedApplicantAddress2) 
     public payable
     returns(bool successTransaction) 
   {
     if(contractDead) throw;
     if(msg.value == 0) throw;
     
-    uint valueToWithdrawal1 = msg.value / 2;
-    uint valueToWithdrawal2 = valueToWithdrawal1;
-    if (msg.value % 2 == 1) valueToWithdrawal2++;
+    uint totalAmountDeposited = msg.value;
+    uint depositRemainder = totalAmountDeposited % 2;
     
-    // I make this to compensate that participant that maybe receive less value in a previous opportunity
-    if (participantsStruct[participantAddress1].authorizedAmountToWithdrawal > participantsStruct[participantAddress2].authorizedAmountToWithdrawal)
-    {
-      participantsStruct[participantAddress1].authorizedAmountToWithdrawal += valueToWithdrawal1;
-      participantsStruct[participantAddress2].authorizedAmountToWithdrawal += valueToWithdrawal2;
-    } else {
-      participantsStruct[participantAddress1].authorizedAmountToWithdrawal += valueToWithdrawal2;
-      participantsStruct[participantAddress2].authorizedAmountToWithdrawal += valueToWithdrawal1;
+    if (depositRemainder % 2 == 1)  {
+      if(!msg.sender.send(depositRemainder)) throw;
+      totalAmountDeposited = totalAmountDeposited - depositRemainder;
     }
     
-    LogDataOfTransaction(msg.sender, msg.value);
+    uint amountAuthorizedForApplicant = totalAmountDeposited / 2;
+    applicantsStruct[authorizedApplicantAddress1].authorizedAmountToWithdrawal += amountAuthorizedForApplicant;
+    applicantsStruct[authorizedApplicantAddress1].isAuthorized = true;
+    applicantsStruct[authorizedApplicantAddress2].authorizedAmountToWithdrawal += amountAuthorizedForApplicant;
+    applicantsStruct[authorizedApplicantAddress2].isAuthorized = true;
+    
+    LogDataOfTransaction(msg.sender, totalAmountDeposited, depositRemainder);
     return true;
   }
   
@@ -65,12 +59,14 @@ contract Splitter {
     returns(bool successWithdrawal) 
   {
     if(contractDead) throw;
-    if(!isParticipant(msg.sender)) throw;
+    if(!isAuthorized(msg.sender)) throw;
     
-    participantsStruct[msg.sender].authorizedAmountToWithdrawal = 0;
-    msg.sender.transfer(participantsStruct[msg.sender].authorizedAmountToWithdrawal);
+    uint authorizedAmountToWithdrawal = applicantsStruct[msg.sender].authorizedAmountToWithdrawal;
+    applicantsStruct[msg.sender].authorizedAmountToWithdrawal = 0;
+
+    if(!msg.sender.send(authorizedAmountToWithdrawal)) throw;
+    LogDataOfWithdrawal(msg.sender, authorizedAmountToWithdrawal);
     
-    LogDataOfWithdrawal(msg.sender, participantsStruct[msg.sender].authorizedAmountToWithdrawal);
     return true;
   }
   
@@ -81,5 +77,5 @@ contract Splitter {
     if(msg.sender != owner) throw;
     contractDead = stateOfContract;
     return !contractDead;
-  }       
+  }     
 }
